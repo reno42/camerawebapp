@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="es">
+<!-- Previous head and style sections remain unchanged -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cámara App</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Previous styles remain unchanged */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #f0f0f0;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            padding: 20px;
+            text-align: center;
+        }
+
+        button {
+            padding: 15px 30px;
+            margin: 10px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .icon-button {
+            font-size: 24px;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 20px;
+        }
+
+        #mediaStream {
+            max-width: 100%;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .preview-container {
+            display: none;
+            width: 100%;
+            max-width: 800px;
+            margin: 20px auto;
+        }
+
+        .preview-image {
+            max-width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .button-group {
+            display: none;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        #captureButton {
+            display: none;
+        }
+
+        .whatsapp-form {
+            display: none;
+            margin: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .whatsapp-form input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .download-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .download-button {
+            background-color: #2196F3;
+        }
+
+        .download-button:hover {
+            background-color: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button id="startButton">Tap to Start</button>
+        
+        <div id="mainButtons" style="display: none;">
+            <button class="icon-button" id="cameraButton">
+                <i class="fas fa-camera"></i>
+            </button>
+            <button class="icon-button" id="galleryButton">
+                <i class="fas fa-images"></i>
+            </button>
+        </div>
+
+        <div id="mediaContainer" style="display: none;">
+            <video id="mediaStream" autoplay playsinline></video>
+            <canvas id="canvas" style="display: none;"></canvas>
+            <button id="captureButton">Capturar</button>
+            <button id="backToMainButton" style="display: none;">Volver</button>
+        </div>
+
+        <div class="preview-container" id="previewContainer">
+            <img id="previewImage" class="preview-image">
+            <video id="previewVideo" class="preview-image" controls style="display: none;"></video>
+            <div class="button-group">
+                <button id="backToCameraButton"><i class="fas fa-camera"></i> Volver a la cámara</button>
+                <button id="shareWhatsappButton"><i class="fab fa-whatsapp"></i> Compartir</button>
+                <button id="printButton"><i class="fas fa-print"></i> Imprimir</button>
+                <div id="downloadButtons" class="download-group" style="display: none;">
+                    <button class="download-button" id="downloadWebm"><i class="fas fa-download"></i> WebM</button>
+                    <button class="download-button" id="downloadMp4"><i class="fas fa-download"></i> MP4</button>
+                    <button class="download-button" id="downloadGif"><i class="fas fa-download"></i> GIF</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="whatsapp-form" id="whatsappForm">
+            <h3>Compartir por WhatsApp</h3>
+            <input type="text" id="userName" placeholder="Tu nombre" required>
+            <input type="tel" id="userPhone" placeholder="Número de WhatsApp (ej: 51992767891)" required>
+            <button id="sendWhatsappButton">Enviar</button>
+            <button id="cancelWhatsappButton">Cancelar</button>
+        </div>
+    </div>
+
+    <div class="modal" id="mediaTypeModal">
+        <div class="modal-content">
+            <h2>¿Qué deseas capturar?</h2>
+            <button id="photoButton">Foto</button>
+            <button id="videoButton">Video</button>
+        </div>
+    </div>
+
+    <input type="file" id="fileInput" accept="image/*,video/*" style="display: none;">
+
+    <script>
+        let mediaRecorder;
+        let recordedChunks = [];
+        let isRecording = false;
+        let recordedBlob = null;
+        let isCurrentMediaVideo = false;
+
+        document.getElementById('startButton').addEventListener('click', () => {
+            document.getElementById('startButton').style.display = 'none';
+            document.getElementById('mainButtons').style.display = 'flex';
+        });
+
+        document.getElementById('cameraButton').addEventListener('click', () => {
+            document.getElementById('mediaTypeModal').style.display = 'flex';
+        });
+
+        document.getElementById('photoButton').addEventListener('click', () => {
+            setupCamera(false);
+            document.getElementById('mediaTypeModal').style.display = 'none';
+        });
+
+        document.getElementById('videoButton').addEventListener('click', () => {
+            setupCamera(true);
+            document.getElementById('mediaTypeModal').style.display = 'none';
+        });
+
+        document.getElementById('galleryButton').addEventListener('click', () => {
+            document.getElementById('fileInput').click();
+        });
+
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const isVideo = file.type.startsWith('video/');
+                    isCurrentMediaVideo = isVideo;
+                    showPreview(event.target.result, isVideo);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        async function setupCamera(isVideo) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: isVideo
+                });
+
+                const videoElement = document.getElementById('mediaStream');
+                videoElement.srcObject = stream;
+                videoElement.style.display = 'block';
+
+                document.getElementById('mainButtons').style.display = 'none';
+                document.getElementById('mediaContainer').style.display = 'block';
+                document.getElementById('captureButton').style.display = 'block';
+                document.getElementById('backToMainButton').style.display = 'block';
+
+                if (isVideo) {
+                    mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder.ondataavailable = (e) => {
+                        if (e.data.size > 0) {
+                            recordedChunks.push(e.data);
+                        }
+                    };
+                    mediaRecorder.onstop = () => {
+                        recordedBlob = new Blob(recordedChunks, { type: 'video/webm' });
+                        showPreview(URL.createObjectURL(recordedBlob), true);
+                        recordedChunks = [];
+                    };
+
+                    document.getElementById('captureButton').textContent = 'Iniciar Grabación';
+                } else {
+                    document.getElementById('captureButton').textContent = 'Tomar Foto';
+                }
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                alert('Error al acceder a la cámara');
+            }
+        }
+
+        document.getElementById('captureButton').addEventListener('click', () => {
+            if (mediaRecorder) {
+                if (!isRecording) {
+                    mediaRecorder.start();
+                    isRecording = true;
+                    document.getElementById('captureButton').textContent = 'Detener Grabación';
+                } else {
+                    mediaRecorder.stop();
+                    isRecording = false;
+                    document.getElementById('captureButton').textContent = 'Iniciar Grabación';
+                }
+            } else {
+                const video = document.getElementById('mediaStream');
+                const canvas = document.getElementById('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                isCurrentMediaVideo = false;
+                showPreview(canvas.toDataURL('image/png'), false);
+            }
+        });
+
+        function showPreview(src, isVideo) {
+            document.getElementById('mediaContainer').style.display = 'none';
+            document.getElementById('previewContainer').style.display = 'block';
+            document.getElementById('downloadButtons').style.display = isVideo ? 'flex' : 'none';
+
+            if (isVideo) {
+                document.getElementById('previewVideo').style.display = 'block';
+                document.getElementById('previewImage').style.display = 'none';
+                document.getElementById('previewVideo').src = src;
+            } else {
+                document.getElementById('previewVideo').style.display = 'none';
+                document.getElementById('previewImage').style.display = 'block';
+                document.getElementById('previewImage').src = src;
+            }
+
+            document.querySelector('.button-group').style.display = 'flex';
+        }
+
+        document.getElementById('shareWhatsappButton').addEventListener('click', () => {
+            document.getElementById('whatsappForm').style.display = 'block';
+        });
+
+        document.getElementById('sendWhatsappButton').addEventListener('click', () => {
+            const name = document.getElementById('userName').value.trim();
+            const phone = document.getElementById('userPhone').value.trim();
+            
+            if (!name || !phone) {
+                alert('Por favor completa todos los campos');
+                return;
+            }
+
+            // Construir el mensaje
+            const message = `Hola, te saluda ${name} de Magia y Brillo`;
+            
+            // Crear y abrir el enlace de WhatsApp
+            const whatsappUrl = `https://api.whatsapp.com/send?phone=+51${phone}&text=${encodeURIComponent(message)}`;
+            window.open(whatsappUrl, '_blank');
+            
+            // Ocultar el formulario
+            document.getElementById('whatsappForm').style.display = 'none';
+        });
+
+        document.getElementById('cancelWhatsappButton').addEventListener('click', () => {
+            document.getElementById('whatsappForm').style.display = 'none';
+        });
+
+        document.getElementById('downloadWebm').addEventListener('click', () => {
+            if (recordedBlob) {
+                downloadVideo(recordedBlob, 'video.webm');
+            }
+        });
+
+        document.getElementById('downloadMp4').addEventListener('click', async () => {
+            if (recordedBlob) {
+                const mp4Blob = await convertToMp4(recordedBlob);
+                downloadVideo(mp4Blob, 'video.mp4');
+            }
+        });
+
+        document.getElementById('downloadGif').addEventListener('click', async () => {
+            if (recordedBlob) {
+                const gifBlob = await convertToGif(recordedBlob);
+                downloadVideo(gifBlob, 'video.gif');
+            }
+        });
+
+        function downloadVideo(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        async function convertToMp4(webmBlob) {
+            // En un entorno real, aquí se implementaría la conversión a MP4
+            return webmBlob;
+        }
+
+        async function convertToGif(webmBlob) {
+            // En un entorno real, aquí se implementaría la conversión a GIF
+            return webmBlob;
+        }
+
+        document.getElementById('backToCameraButton').addEventListener('click', () => {
+            document.getElementById('previewContainer').style.display = 'none';
+            document.getElementById('mediaContainer').style.display = 'block';
+            document.getElementById('whatsappForm').style.display = 'none';
+        });
+
+        document.getElementById('backToMainButton').addEventListener('click', () => {
+            stopMediaStream();
+            document.getElementById('mediaContainer').style.display = 'none';
+            document.getElementById('mainButtons').style.display = 'flex';
+            document.getElementById('whatsappForm').style.display = 'none';
+        });
+
+        document.getElementById('printButton').addEventListener('click', () => {
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write('<html><head><title>Print</title></head><body>');
+            printWindow.document.write('<img src="' + document.getElementById('previewImage').src + '" style="width: 100%;">');
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+            printWindow.print();
+        });
+
+        function stopMediaStream() {
+            const videoElement = document.getElementById('mediaStream');
+            if (videoElement.srcObject) {
+                videoElement.srcObject.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
+            }
+        }
+
+        window.addEventListener('beforeunload', stopMediaStream);
+    </script>
+</body>
+</html>
